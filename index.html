@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Super POMP World - Happy Birthday Krub</title>
+
+<!-- โหลดฟอนต์พิกเซลจาก Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+<style>
+  /* ========================================================
+     ส่วนที่ 1: CSS พื้นฐานและธีมตู้เกมย้อนยุค (Arcade Theme)
+     ======================================================== */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background: #0d0221;
+    color: #fff;
+    font-family: 'Press Start 2P', cursive;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+    /* ลายเส้นสแกนไลน์แบบจอทีวีย้อนยุค */
+    background-image:
+      radial-gradient(circle at 50% 0%, #2b0a4a 0%, #0d0221 70%);
+  }
+
+  #game-container {
+    position: relative;
+    width: 800px;
+    max-width: 96vw;
+    border: 6px solid #ff8a00;
+    box-shadow:
+      0 0 0 4px #000,
+      0 0 25px 6px rgba(255, 138, 0, 0.6);
+    background: #000;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    image-rendering: pixelated; /* คงความคมชัดของพิกเซล */
+    background: #87ceeb;
+  }
+
+  /* ========================================================
+     ส่วนที่ 2: หน้าจอเริ่มต้นเกม (Start Screen)
+     ======================================================== */
+  #start-screen {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: linear-gradient(180deg, #1a0033 0%, #3a0068 60%, #1a0033 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    text-align: center;
+    padding: 20px;
+  }
+
+  #start-screen h1 {
+    font-size: 34px;
+    color: #ffd400;
+    text-shadow:
+      3px 3px 0 #ff2e63,
+      6px 6px 0 #000;
+    letter-spacing: 2px;
+    margin-bottom: 14px;
+  }
+
+  #start-screen .subtitle {
+    font-size: 12px;
+    color: #7be0ff;
+    margin-bottom: 40px;
+    line-height: 1.8;
+  }
+
+  #press-start {
+    font-size: 16px;
+    color: #fff;
+    animation: blink 1s steps(1) infinite;
+    cursor: pointer;
+    padding: 10px 18px;
+    border: 3px solid #fff;
+    background: rgba(255,255,255,0.05);
+  }
+
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+
+  /* พิกเซลตัวละครเล็กๆ ประดับหน้า Start Screen (วาดด้วย box-shadow แบบ pixel-art) */
+  #start-sprite {
+    width: 8px;
+    height: 8px;
+    margin-bottom: 24px;
+    transform: scale(6);
+    image-rendering: pixelated;
+  }
+
+  /* ========================================================
+     ส่วนที่ 3: HUD (แสดงจำนวนไอเทมที่เก็บได้)
+     ======================================================== */
+  #hud {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    font-size: 12px;
+    color: #ffd400;
+    text-shadow: 2px 2px 0 #000;
+    background: rgba(0,0,0,0.4);
+    padding: 6px 10px;
+    display: none;
+  }
+
+  #instructions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    font-size: 8px;
+    color: #7be0ff;
+    text-shadow: 1px 1px 0 #000;
+    background: rgba(0,0,0,0.4);
+    padding: 6px 8px;
+    display: none;
+    line-height: 1.6;
+  }
+
+  /* ========================================================
+     ส่วนที่ 4: Modal Pop-up สำหรับข้อความอวยพรวันเกิด (Surprise)
+     ======================================================== */
+  #hbd-modal {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.75);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 20px;
+  }
+
+  #hbd-modal.show {
+    display: flex;
+    animation: fadeIn 0.6s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  #hbd-box {
+    background: linear-gradient(180deg, #ff2e63 0%, #ff8a00 100%);
+    border: 5px solid #fff;
+    box-shadow: 0 0 0 5px #000, 0 0 40px 10px rgba(255,212,0,0.8);
+    padding: 30px 22px;
+    max-width: 640px;
+    text-align: center;
+    animation: popIn 0.5s cubic-bezier(.36,1.5,.64,1) both;
+  }
+
+  @keyframes popIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  #hbd-box .emoji-row {
+    font-size: 28px;
+    margin-bottom: 16px;
+  }
+
+  #hbd-box h2 {
+    font-size: 16px;
+    color: #ffd400;
+    text-shadow: 2px 2px 0 #000;
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  #hbd-box p {
+    font-size: 12px;
+    color: #fff;
+    line-height: 2.1;
+    text-shadow: 1px 1px 0 #000;
+    margin-bottom: 24px;
+  }
+
+  #hbd-close {
+    font-family: 'Press Start 2P', cursive;
+    font-size: 12px;
+    padding: 10px 20px;
+    background: #1a0033;
+    color: #ffd400;
+    border: 3px solid #ffd400;
+    cursor: pointer;
+  }
+  #hbd-close:hover {
+    background: #ffd400;
+    color: #1a0033;
+  }
+
+  /* Canvas เอฟเฟกต์พลุพิกเซล วางซ้อนด้านบนสุด */
+  #fireworks-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 40;
+    pointer-events: none;
+    display: none;
+  }
+
+  /* ========================================================
+     ส่วนที่ 5: ปุ่มควบคุมบนหน้าจอ (Touch Controls)
+     ใช้ทั้งบนมือถือ (แตะ) และคอมพิวเตอร์ (คลิกเมาส์)
+     ======================================================== */
+  #touch-controls {
+    position: absolute;
+    bottom: 14px;
+    left: 0;
+    width: 100%;
+    z-index: 30;
+    display: none; /* จะเปิดเป็น flex ตอนเริ่มเกม */
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 0 16px;
+    pointer-events: none; /* container เองไม่บล็อกคลิก ให้ปุ่มด้านในรับแทน */
+  }
+
+  #move-buttons, #action-buttons {
+    display: flex;
+    gap: 10px;
+    pointer-events: auto;
+  }
+
+  .ctrl-btn {
+    width: 54px;
+    height: 54px;
+    background: rgba(20, 5, 40, 0.75);
+    border: 3px solid #ffd400;
+    color: #ffd400;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    box-shadow: 0 0 10px rgba(255, 212, 0, 0.5);
+  }
+
+  .ctrl-btn:active,
+  .ctrl-btn.active-press {
+    background: #ffd400;
+    color: #1a0033;
+  }
+
+  #jump-btn {
+    width: 70px;
+    height: 70px;
+    font-size: 11px;
+    border-color: #4ad4ff;
+    color: #4ad4ff;
+    box-shadow: 0 0 10px rgba(74, 212, 255, 0.5);
+  }
+
+  #jump-btn:active,
+  #jump-btn.active-press {
+    background: #4ad4ff;
+    color: #1a0033;
+  }
+
+  /* ปุ่มควบคุมแสดงเฉพาะตอนกำลังเล่นเกมเท่านั้น (คุมด้วย JS toggle class) */
+  #touch-controls.visible {
+    display: flex;
+  }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+
+  <!-- ===================== START SCREEN ===================== -->
+  <div id="start-screen">
+    <h1>SUPER POMP WORLD</h1>
+    <div class="subtitle">A BIRTHDAY QUEST FOR THE BEST DAD</div>
+    <div id="press-start">▶ PRESS START TO PLAY ◀</div>
+  </div>
+
+  <!-- ===================== HUD ===================== -->
+  <div id="hud">ITEMS: <span id="item-count">0</span> / 5</div>
+  <div id="instructions">◀ ▶ : MOVE<br>SPACE / ▲ : JUMP</div>
+
+  <!-- ===================== เกมหลัก (Canvas) ===================== -->
+  <canvas id="game-canvas" width="800" height="450"></canvas>
+
+  <!-- ===================== เอฟเฟกต์พลุพิกเซล ===================== -->
+  <canvas id="fireworks-canvas" width="800" height="450"></canvas>
+
+  <!-- ===================== ปุ่มควบคุมบนหน้าจอ (Touch Controls) ===================== -->
+  <div id="touch-controls">
+    <div id="move-buttons">
+      <div class="ctrl-btn" id="btn-left">◀</div>
+      <div class="ctrl-btn" id="btn-right">▶</div>
+    </div>
+    <div id="action-buttons">
+      <div class="ctrl-btn" id="jump-btn">JUMP</div>
+    </div>
+  </div>
+
+  <!-- ===================== POP-UP อวยพรวันเกิด ===================== -->
+  <div id="hbd-modal">
+    <div id="hbd-box">
+      <div class="emoji-row">🎂🎉🎁</div>
+      <h2>LEVEL CLEAR!</h2>
+      <p>สุขสันต์นะฅรับพ่อจ๋า<br>
+      อายุครบ 48 ปีแล้ว<br>
+      ขอให้พ่อจ๋าร่ำรวยมั่งมีเงินทอง<br>
+      สุขภาพร่างกายแข็งแรง<br>
+      อยู่ด้วยกันไปนาน ๆ นะพ่อจ๋า</p>
+      <button id="hbd-close">THANK YOU ❤</button>
+    </div>
+  </div>
+
+  <!-- เสียงเพลงประกอบ: ผู้ใช้สามารถนำไฟล์เพลงของตัวเองมาใส่ src ตรงนี้ได้ -->
+  <audio id="bgm" loop>
+     <source src="hbd-dad.mp3" type="audio/mpeg">
+</audio>
+
+</div>
+
+<script>
+/* ============================================================
+   SUPER POMP WORLD - Birthday Pixel Game
+   โครงสร้างโค้ดแบ่งเป็นส่วนหลักๆ ดังนี้:
+   1. Setup & Global State        - ตัวแปรสถานะเกม, canvas context
+   2. Player                      - ตัวละครผู้เล่น + สไปรท์แอนิเมชัน
+   3. Background / Environment    - ฉากห้องนั่งเล่น
+   4. Items                       - ไอเทมที่ต้องเก็บ
+   5. Physics & Controls          - แรงโน้มถ่วง, การควบคุม
+   6. Collision & Score           - ตรวจชนและนับคะแนน
+   7. Win Sequence / Surprise     - ฉากจบเกมและ Pop-up วันเกิด
+   8. Pixel Fireworks             - เอฟเฟกต์พลุ
+   9. Game Loop                   - ลูปหลักของเกม
+   ============================================================ */
+
+/* ---------- 1. SETUP & GLOBAL STATE ---------- */
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+const GROUND_Y = H - 60; // ระดับพื้นห้อง
+
+let gameState = 'start'; // 'start' | 'playing' | 'win-transition' | 'won'
+let itemsCollected = 0;
+const TOTAL_ITEMS = 5;
+let winFadeAlpha = 0;
+let winTextTimer = 0;
+
+const keys = { left: false, right: false, up: false };
+
+/* ---------- 2. PLAYER (ตัวละครคุณพ่อ) ---------- */
+const player = {
+  x: 60,
+  y: GROUND_Y - 48,
+  w: 24,
+  h: 48,
+  vy: 0,
+  speed: 3.2,
+  jumping: false,
+  facing: 1,       // 1 = ขวา, -1 = ซ้าย
+  walkFrame: 0,
+  walkTimer: 0
+};
+
+const GRAVITY = 0.55;
+const JUMP_FORCE = -11;
+
+// วาดตัวละครผู้เล่นด้วยบล็อกพิกเซล (ผมสั้นดำ, แว่น, เสื้อโปโลส้ม, กางเกงดำ)
+function drawPlayer() {
+  const px = Math.round(player.x);
+  const py = Math.round(player.y);
+  const isMoving = keys.left || keys.right;
+  const legOffset = isMoving ? (player.walkFrame === 0 ? 3 : -3) : 0;
+
+  ctx.save();
+
+  // เท้า/รองเท้า (สีน้ำตาลเข้ม)
+  ctx.fillStyle = '#3a2418';
+  ctx.fillRect(px + 2 + legOffset, py + 44, 8, 4);
+  ctx.fillRect(px + 14 - legOffset, py + 44, 8, 4);
+
+  // ขากางเกงขายาวสีดำ (สลับขยับเดิน)
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(px + 3 + legOffset, py + 32, 7, 14);
+  ctx.fillRect(px + 14 - legOffset, py + 32, 7, 14);
+
+  // ลำตัว: เสื้อโปโลสีส้ม
+  ctx.fillStyle = '#ff8a00';
+  ctx.fillRect(px + 2, py + 16, 20, 18);
+  // ปกเสื้อ
+  ctx.fillStyle = '#e06f00';
+  ctx.fillRect(px + 9, py + 16, 6, 4);
+
+  // แขน (สีส้มเข้าชุดกับเสื้อ, ขยับเล็กน้อยตอนเดิน)
+  ctx.fillStyle = '#ff8a00';
+  ctx.fillRect(px - 1, py + 18 + (isMoving ? legOffset / 3 : 0), 5, 12);
+  ctx.fillRect(px + 20, py + 18 - (isMoving ? legOffset / 3 : 0), 5, 12);
+  // มือ
+  ctx.fillStyle = '#e0a878';
+  ctx.fillRect(px - 1, py + 28, 5, 4);
+  ctx.fillRect(px + 20, py + 28, 5, 4);
+
+  // คอ
+  ctx.fillStyle = '#e0a878';
+  ctx.fillRect(px + 9, py + 12, 6, 5);
+
+  // หัว (สีผิว)
+  ctx.fillStyle = '#e0a878';
+  ctx.fillRect(px + 4, py, 16, 14);
+
+  // ผมสั้นสีดำ
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(px + 3, py - 2, 18, 6);
+  ctx.fillRect(px + 3, py, 3, 8);
+  ctx.fillRect(px + 18, py, 3, 8);
+
+  // แว่นตา (กรอบดำ + เลนส์ฟ้าอ่อนใส)
+  ctx.fillStyle = '#111';
+  ctx.fillRect(px + 5, py + 6, 6, 4);
+  ctx.fillRect(px + 13, py + 6, 6, 4);
+  ctx.fillRect(px + 11, py + 7, 2, 1); // สะพานแว่น
+  ctx.fillStyle = 'rgba(180,220,255,0.6)';
+  ctx.fillRect(px + 6, py + 7, 4, 2);
+  ctx.fillRect(px + 14, py + 7, 4, 2);
+
+  // ปาก (รอยยิ้มเล็กๆ)
+  ctx.fillStyle = '#8a4a2a';
+  ctx.fillRect(px + 9, py + 11, 4, 1);
+
+  ctx.restore();
+}
+
+/* ---------- 3. BACKGROUND / ENVIRONMENT ---------- */
+// วาดฉากห้องนั่งเล่นตอนเช้า โทนอบอุ่นสไตล์พิกเซลเรโทร
+function drawBackground() {
+  // ผนังห้อง (โทนครีมอุ่น)
+  ctx.fillStyle = '#f4d9a8';
+  ctx.fillRect(0, 0, W, GROUND_Y);
+
+  // แสงแดดตอนเช้าลอดหน้าต่าง (มุมขวาบน)
+  ctx.fillStyle = 'rgba(255, 230, 150, 0.35)';
+  ctx.fillRect(W - 180, 0, 180, GROUND_Y);
+
+  // หน้าต่างกรอบไม้ (อยู่สูงบนผนังตามธรรมชาติของหน้าต่าง แต่ขยับลงมาเล็กน้อย)
+  ctx.fillStyle = '#8a5a2a';
+  ctx.fillRect(W - 150, 55, 110, 90);
+  ctx.fillStyle = '#bfe8ff';
+  ctx.fillRect(W - 142, 63, 94, 74);
+  ctx.fillStyle = '#8a5a2a';
+  ctx.fillRect(W - 150, 95, 110, 6);
+  ctx.fillRect(W - 100, 55, 6, 90);
+
+  // พื้นพรมลายตาราง
+  ctx.fillStyle = '#c46a3a';
+  ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+  ctx.fillStyle = '#a8552a';
+  for (let i = 0; i < W; i += 40) {
+    ctx.fillRect(i, GROUND_Y, 20, H - GROUND_Y);
+  }
+
+  // ชั้นวางหนังสือ (ซ้าย) - ขยับลงมาให้ฐานชนกับพื้นห้องพอดี
+  ctx.fillStyle = '#6b4423';
+  ctx.fillRect(20, 110, 90, GROUND_Y - 110);
+  ctx.fillStyle = '#5a3618';
+  ctx.fillRect(20, 145, 90, 6);
+  ctx.fillRect(20, 180, 90, 6);
+  // หนังสือสีสันต่างๆ (2 แถวบน)
+  const bookColors = ['#ff5e5e', '#5ecbff', '#ffd35e', '#7bff8a', '#c77bff'];
+  for (let i = 0; i < 5; i++) {
+    ctx.fillStyle = bookColors[i];
+    ctx.fillRect(26 + i * 15, 116, 11, 26);
+  }
+  for (let i = 0; i < 5; i++) {
+    ctx.fillStyle = bookColors[(i + 2) % bookColors.length];
+    ctx.fillRect(26 + i * 15, 152, 11, 26);
+  }
+  // ตู้ล่างของชั้นวาง (ส่วนทึบชนพื้น) + เส้นแบ่งบานตู้ + มือจับ
+  ctx.fillStyle = '#5a3618';
+  ctx.fillRect(20, 188, 90, GROUND_Y - 188);
+  ctx.fillStyle = '#4a2c12';
+  ctx.fillRect(64, 188, 2, GROUND_Y - 188); // เส้นแบ่งบานตู้ 2 บาน
+  ctx.fillStyle = '#ffd400';
+  ctx.fillRect(58, 220, 3, 3);  // มือจับบานซ้าย
+  ctx.fillRect(69, 220, 3, 3);  // มือจับบานขวา
+
+  // กรอบรูปครอบครัวบนผนัง (ขยับลงมา + ขยายให้พอดีกับ 3 คน)
+  ctx.fillStyle = '#4a2f1a';
+  ctx.fillRect(225, 90, 74, 50);
+  ctx.fillStyle = '#fff8e8';
+  ctx.fillRect(230, 95, 64, 40);
+
+  // สมาชิกในภาพ 3 คน ยืนเรียงกันบนเส้นฐานเดียวกัน (feet baseline y=131)
+  // 1) พ่อ - เสื้อสีส้ม (ตัวใหญ่สุด อยู่ตรงกลาง)
+  ctx.fillStyle = '#e0a878';
+  ctx.fillRect(246, 105, 4, 5);   // หัว
+  ctx.fillStyle = '#ff8a00';
+  ctx.fillRect(244, 111, 8, 15);  // ลำตัว/เสื้อส้ม
+
+  // 2) ฉัน - เสื้อสีชมพู (ยืนซ้ายมือพ่อ)
+  ctx.fillStyle = '#e0a878';
+  ctx.fillRect(233, 106, 4, 5);   // หัว
+  ctx.fillStyle = '#ff6fb0';
+  ctx.fillRect(231, 112, 8, 14);  // ลำตัว/เสื้อชมพู
+
+  // 3) น้องชาย - เสื้อสีฟ้า (ตัวเล็กกว่า ยืนขวามือพ่อ)
+  ctx.fillStyle = '#e0a878';
+  ctx.fillRect(268, 111, 3, 4);   // หัว (เล็กลง)
+  ctx.fillStyle = '#4ad4ff';
+  ctx.fillRect(266, 116, 7, 10);  // ลำตัว/เสื้อฟ้า (เตี้ยกว่าคนอื่น)
+
+  // ทีวีจอพิกเซล (ขยับลงมาตั้งบนตู้คอนโซลที่ฐานชนพื้นห้องพอดี)
+  const tvTop = 240;
+  ctx.fillStyle = '#2a2a2a';
+  ctx.fillRect(420, tvTop, 100, 66);
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(428, tvTop + 6, 84, 50);
+  ctx.fillStyle = '#0d2b1a';
+  ctx.fillRect(432, tvTop + 10, 76, 42);
+
+  // ตัวเลขบนจอทีวี (วันที่พิเศษ) แสดงด้วยฟอนต์พิกเซลสีเขียวเรืองแสงแบบจอเก่า
+  ctx.save();
+  ctx.font = '13px "Press Start 2P"';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#4dff8a';
+  ctx.shadowColor = '#4dff8a';
+  ctx.shadowBlur = 6;
+  ctx.fillText('24092521', 420 + 50, tvTop + 33);
+  ctx.restore();
+
+  // ตู้คอนโซลวางทีวี (ฐานชนพื้นห้อง)
+  ctx.fillStyle = '#7a4a26';
+  ctx.fillRect(400, tvTop + 66, 140, GROUND_Y - (tvTop + 66) - 14);
+  ctx.fillStyle = '#5a3418';
+  ctx.fillRect(405, GROUND_Y - 14, 10, 14);
+  ctx.fillRect(525, GROUND_Y - 14, 10, 14);
+
+  // โซฟา (ขวาล่าง) - ขยับลงมาให้ขาโซฟาชนกับพื้นห้องพอดี
+  ctx.fillStyle = '#c0392b';
+  ctx.fillRect(600, 280, 160, 90);
+  ctx.fillStyle = '#a83224';
+  ctx.fillRect(600, 280, 160, 16); // พนักพิง
+  ctx.fillStyle = '#e0574a';
+  ctx.fillRect(612, 298, 60, 48); // เบาะซ้าย
+  ctx.fillRect(682, 298, 60, 48); // เบาะขวา
+  ctx.fillStyle = '#7a1f16';
+  ctx.fillRect(596, GROUND_Y - 20, 12, 20); // ขาโซฟาซ้าย
+  ctx.fillRect(752, GROUND_Y - 20, 12, 20); // ขาโซฟาขวา
+}
+
+/* ---------- 4. ITEMS (ไอเทมที่ต้องเก็บ) ---------- */
+// กำหนดตำแหน่งไอเทม 5 ชิ้น กระจายในฉาก บางชิ้นอยู่สูงต้องกระโดดเก็บ
+let items = [
+  { type: 'cake',   x: 150, y: GROUND_Y - 24, w: 22, h: 20, collected: false },
+  { type: 'beer',   x: 300, y: GROUND_Y - 22, w: 16, h: 22, collected: false },
+  { type: 'car',    x: 500, y: GROUND_Y - 16, w: 26, h: 14, collected: false },
+  { type: 'gift',   x: 660, y: GROUND_Y - 20, w: 20, h: 20, collected: false },
+  { type: 'money',  x: 250, y: GROUND_Y - 90, w: 22, h: 14, collected: false } // ลอยสูง ต้องกระโดดเก็บ
+];
+
+function resetItems() {
+  items.forEach(it => it.collected = false);
+  itemsCollected = 0;
+  document.getElementById('item-count').textContent = '0';
+}
+
+// วาดไอเทมแต่ละชนิดด้วยพิกเซลบล็อกง่ายๆ
+function drawItem(it) {
+  if (it.collected) return;
+  const x = Math.round(it.x);
+  const y = Math.round(it.y);
+
+  // เอฟเฟกต์ลอยขึ้นลงเล็กน้อย (bobbing)
+  const bob = Math.sin(Date.now() / 250 + it.x) * 3;
+  const dy = y + bob;
+
+  ctx.save();
+
+  if (it.type === 'cake') {
+    ctx.fillStyle = '#f7c9de';
+    ctx.fillRect(x, dy + 8, 22, 12);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x, dy + 8, 22, 3);
+    ctx.fillStyle = '#ff4d6d';
+    ctx.fillRect(x + 9, dy, 3, 8);
+    ctx.fillStyle = '#ffd400';
+    ctx.fillRect(x + 10, dy - 4, 1, 4);
+  } else if (it.type === 'beer') {
+    ctx.fillStyle = '#ffcc33';
+    ctx.fillRect(x + 3, dy + 4, 10, 18);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x + 3, dy + 2, 10, 4);
+    ctx.fillStyle = '#8a5a2a';
+    ctx.fillRect(x + 13, dy + 6, 4, 8); // หูจับ
+  } else if (it.type === 'car') {
+    ctx.fillStyle = '#e63946';
+    ctx.fillRect(x, dy + 2, 26, 8);
+    ctx.fillRect(x + 5, dy - 4, 14, 8);
+    ctx.fillStyle = '#bfe8ff';
+    ctx.fillRect(x + 7, dy - 2, 10, 5);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(x + 2, dy + 9, 6, 6);
+    ctx.fillRect(x + 17, dy + 9, 6, 6);
+  } else if (it.type === 'gift') {
+    ctx.fillStyle = '#4ecdc4';
+    ctx.fillRect(x, dy + 4, 20, 16);
+    ctx.fillStyle = '#ffd400';
+    ctx.fillRect(x + 8, dy + 4, 4, 16);
+    ctx.fillRect(x, dy + 9, 20, 4);
+    ctx.fillStyle = '#ffd400';
+    ctx.fillRect(x + 5, dy, 3, 6);
+    ctx.fillRect(x + 12, dy, 3, 6);
+  } else if (it.type === 'money') {
+    ctx.fillStyle = '#4caf50';
+    ctx.fillRect(x, dy + 4, 22, 12);
+    ctx.fillStyle = '#2e7d32';
+    ctx.fillRect(x + 2, dy + 6, 18, 8);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x + 9, dy + 8, 4, 4);
+  }
+
+  ctx.restore();
+}
+
+/* ---------- 5. PHYSICS & CONTROLS ---------- */
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'ArrowLeft') keys.left = true;
+  if (e.code === 'ArrowRight') keys.right = true;
+  if (e.code === 'ArrowUp' || e.code === 'Space') keys.up = true;
+});
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowLeft') keys.left = false;
+  if (e.code === 'ArrowRight') keys.right = false;
+  if (e.code === 'ArrowUp' || e.code === 'Space') keys.up = false;
+});
+
+// ---- ปุ่มควบคุมบนหน้าจอ (Touch Controls) ----
+// รองรับทั้งการ "แตะ" บนมือถือ (touchstart/touchend) และ "คลิกเมาส์" บนคอม (mousedown/mouseup)
+// ผูกปุ่มแต่ละปุ่มเข้ากับตัวแปร keys ตัวเดียวกับที่คีย์บอร์ดใช้ เพื่อให้ logic การเคลื่อนไหวทำงานร่วมกันได้
+function bindHoldButton(el, onPress, onRelease) {
+  const press = (e) => {
+    e.preventDefault();
+    el.classList.add('active-press');
+    onPress();
+  };
+  const release = (e) => {
+    e.preventDefault();
+    el.classList.remove('active-press');
+    onRelease();
+  };
+
+  el.addEventListener('touchstart', press, { passive: false });
+  el.addEventListener('touchend', release, { passive: false });
+  el.addEventListener('touchcancel', release, { passive: false });
+
+  el.addEventListener('mousedown', press);
+  el.addEventListener('mouseup', release);
+  el.addEventListener('mouseleave', release); // เผื่อลากเมาส์ออกนอกปุ่มระหว่างกด
+}
+
+const btnLeft = document.getElementById('btn-left');
+const btnRight = document.getElementById('btn-right');
+con
