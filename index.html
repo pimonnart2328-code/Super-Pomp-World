@@ -345,313 +345,25 @@
 </audio>
 
 </div>
-
-<script>
-/* ============================================================
-   SUPER POMP WORLD - Birthday Pixel Game
-   โครงสร้างโค้ดแบ่งเป็นส่วนหลักๆ ดังนี้:
-   1. Setup & Global State        - ตัวแปรสถานะเกม, canvas context
-   2. Player                      - ตัวละครผู้เล่น + สไปรท์แอนิเมชัน
-   3. Background / Environment    - ฉากห้องนั่งเล่น
-   4. Items                       - ไอเทมที่ต้องเก็บ
-   5. Physics & Controls          - แรงโน้มถ่วง, การควบคุม
-   6. Collision & Score           - ตรวจชนและนับคะแนน
-   7. Win Sequence / Surprise     - ฉากจบเกมและ Pop-up วันเกิด
-   8. Pixel Fireworks             - เอฟเฟกต์พลุ
-   9. Game Loop                   - ลูปหลักของเกม
-   ============================================================ */
-
+  <script>
 /* ---------- 1. SETUP & GLOBAL STATE ---------- */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 const W = canvas.width;
 const H = canvas.height;
-const GROUND_Y = H - 60; // ระดับพื้นห้อง
+const GROUND_Y = H - 60;
 
-let gameState = 'start'; // 'start' | 'playing' | 'win-transition' | 'won'
+let gameState = 'start';
 let itemsCollected = 0;
 const TOTAL_ITEMS = 5;
 let winFadeAlpha = 0;
-let winTextTimer = 0;
 
 const keys = { left: false, right: false, up: false };
-
-/* ---------- 2. PLAYER (ตัวละครคุณพ่อ) ---------- */
-const player = {
-  x: 60,
-  y: GROUND_Y - 48,
-  w: 24,
-  h: 48,
-  vy: 0,
-  speed: 3.2,
-  jumping: false,
-  facing: 1,       // 1 = ขวา, -1 = ซ้าย
-  walkFrame: 0,
-  walkTimer: 0
-};
-
-const GRAVITY = 0.55;
-const JUMP_FORCE = -11;
-
-// วาดตัวละครผู้เล่นด้วยบล็อกพิกเซล (ผมสั้นดำ, แว่น, เสื้อโปโลส้ม, กางเกงดำ)
-function drawPlayer() {
-  const px = Math.round(player.x);
-  const py = Math.round(player.y);
-  const isMoving = keys.left || keys.right;
-  const legOffset = isMoving ? (player.walkFrame === 0 ? 3 : -3) : 0;
-
-  ctx.save();
-
-  // เท้า/รองเท้า (สีน้ำตาลเข้ม)
-  ctx.fillStyle = '#3a2418';
-  ctx.fillRect(px + 2 + legOffset, py + 44, 8, 4);
-  ctx.fillRect(px + 14 - legOffset, py + 44, 8, 4);
-
-  // ขากางเกงขายาวสีดำ (สลับขยับเดิน)
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(px + 3 + legOffset, py + 32, 7, 14);
-  ctx.fillRect(px + 14 - legOffset, py + 32, 7, 14);
-
-  // ลำตัว: เสื้อโปโลสีส้ม
-  ctx.fillStyle = '#ff8a00';
-  ctx.fillRect(px + 2, py + 16, 20, 18);
-  // ปกเสื้อ
-  ctx.fillStyle = '#e06f00';
-  ctx.fillRect(px + 9, py + 16, 6, 4);
-
-  // แขน (สีส้มเข้าชุดกับเสื้อ, ขยับเล็กน้อยตอนเดิน)
-  ctx.fillStyle = '#ff8a00';
-  ctx.fillRect(px - 1, py + 18 + (isMoving ? legOffset / 3 : 0), 5, 12);
-  ctx.fillRect(px + 20, py + 18 - (isMoving ? legOffset / 3 : 0), 5, 12);
-  // มือ
-  ctx.fillStyle = '#e0a878';
-  ctx.fillRect(px - 1, py + 28, 5, 4);
-  ctx.fillRect(px + 20, py + 28, 5, 4);
-
-  // คอ
-  ctx.fillStyle = '#e0a878';
-  ctx.fillRect(px + 9, py + 12, 6, 5);
-
-  // หัว (สีผิว)
-  ctx.fillStyle = '#e0a878';
-  ctx.fillRect(px + 4, py, 16, 14);
-
-  // ผมสั้นสีดำ
-  ctx.fillStyle = '#0a0a0a';
-  ctx.fillRect(px + 3, py - 2, 18, 6);
-  ctx.fillRect(px + 3, py, 3, 8);
-  ctx.fillRect(px + 18, py, 3, 8);
-
-  // แว่นตา (กรอบดำ + เลนส์ฟ้าอ่อนใส)
-  ctx.fillStyle = '#111';
-  ctx.fillRect(px + 5, py + 6, 6, 4);
-  ctx.fillRect(px + 13, py + 6, 6, 4);
-  ctx.fillRect(px + 11, py + 7, 2, 1); // สะพานแว่น
-  ctx.fillStyle = 'rgba(180,220,255,0.6)';
-  ctx.fillRect(px + 6, py + 7, 4, 2);
-  ctx.fillRect(px + 14, py + 7, 4, 2);
-
-  // ปาก (รอยยิ้มเล็กๆ)
-  ctx.fillStyle = '#8a4a2a';
-  ctx.fillRect(px + 9, py + 11, 4, 1);
-
-  ctx.restore();
-}
-
-/* ---------- 3. BACKGROUND / ENVIRONMENT ---------- */
-// วาดฉากห้องนั่งเล่นตอนเช้า โทนอบอุ่นสไตล์พิกเซลเรโทร
-function drawBackground() {
-  // ผนังห้อง (โทนครีมอุ่น)
-  ctx.fillStyle = '#f4d9a8';
-  ctx.fillRect(0, 0, W, GROUND_Y);
-
-  // แสงแดดตอนเช้าลอดหน้าต่าง (มุมขวาบน)
-  ctx.fillStyle = 'rgba(255, 230, 150, 0.35)';
-  ctx.fillRect(W - 180, 0, 180, GROUND_Y);
-
-  // หน้าต่างกรอบไม้ (อยู่สูงบนผนังตามธรรมชาติของหน้าต่าง แต่ขยับลงมาเล็กน้อย)
-  ctx.fillStyle = '#8a5a2a';
-  ctx.fillRect(W - 150, 55, 110, 90);
-  ctx.fillStyle = '#bfe8ff';
-  ctx.fillRect(W - 142, 63, 94, 74);
-  ctx.fillStyle = '#8a5a2a';
-  ctx.fillRect(W - 150, 95, 110, 6);
-  ctx.fillRect(W - 100, 55, 6, 90);
-
-  // พื้นพรมลายตาราง
-  ctx.fillStyle = '#c46a3a';
-  ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
-  ctx.fillStyle = '#a8552a';
-  for (let i = 0; i < W; i += 40) {
-    ctx.fillRect(i, GROUND_Y, 20, H - GROUND_Y);
-  }
-
-  // ชั้นวางหนังสือ (ซ้าย) - ขยับลงมาให้ฐานชนกับพื้นห้องพอดี
-  ctx.fillStyle = '#6b4423';
-  ctx.fillRect(20, 110, 90, GROUND_Y - 110);
-  ctx.fillStyle = '#5a3618';
-  ctx.fillRect(20, 145, 90, 6);
-  ctx.fillRect(20, 180, 90, 6);
-  // หนังสือสีสันต่างๆ (2 แถวบน)
-  const bookColors = ['#ff5e5e', '#5ecbff', '#ffd35e', '#7bff8a', '#c77bff'];
-  for (let i = 0; i < 5; i++) {
-    ctx.fillStyle = bookColors[i];
-    ctx.fillRect(26 + i * 15, 116, 11, 26);
-  }
-  for (let i = 0; i < 5; i++) {
-    ctx.fillStyle = bookColors[(i + 2) % bookColors.length];
-    ctx.fillRect(26 + i * 15, 152, 11, 26);
-  }
-  // ตู้ล่างของชั้นวาง (ส่วนทึบชนพื้น) + เส้นแบ่งบานตู้ + มือจับ
-  ctx.fillStyle = '#5a3618';
-  ctx.fillRect(20, 188, 90, GROUND_Y - 188);
-  ctx.fillStyle = '#4a2c12';
-  ctx.fillRect(64, 188, 2, GROUND_Y - 188); // เส้นแบ่งบานตู้ 2 บาน
-  ctx.fillStyle = '#ffd400';
-  ctx.fillRect(58, 220, 3, 3);  // มือจับบานซ้าย
-  ctx.fillRect(69, 220, 3, 3);  // มือจับบานขวา
-
-  // กรอบรูปครอบครัวบนผนัง (ขยับลงมา + ขยายให้พอดีกับ 3 คน)
-  ctx.fillStyle = '#4a2f1a';
-  ctx.fillRect(225, 90, 74, 50);
-  ctx.fillStyle = '#fff8e8';
-  ctx.fillRect(230, 95, 64, 40);
-
-  // สมาชิกในภาพ 3 คน ยืนเรียงกันบนเส้นฐานเดียวกัน (feet baseline y=131)
-  // 1) พ่อ - เสื้อสีส้ม (ตัวใหญ่สุด อยู่ตรงกลาง)
-  ctx.fillStyle = '#e0a878';
-  ctx.fillRect(246, 105, 4, 5);   // หัว
-  ctx.fillStyle = '#ff8a00';
-  ctx.fillRect(244, 111, 8, 15);  // ลำตัว/เสื้อส้ม
-
-  // 2) ฉัน - เสื้อสีชมพู (ยืนซ้ายมือพ่อ)
-  ctx.fillStyle = '#e0a878';
-  ctx.fillRect(233, 106, 4, 5);   // หัว
-  ctx.fillStyle = '#ff6fb0';
-  ctx.fillRect(231, 112, 8, 14);  // ลำตัว/เสื้อชมพู
-
-  // 3) น้องชาย - เสื้อสีฟ้า (ตัวเล็กกว่า ยืนขวามือพ่อ)
-  ctx.fillStyle = '#e0a878';
-  ctx.fillRect(268, 111, 3, 4);   // หัว (เล็กลง)
-  ctx.fillStyle = '#4ad4ff';
-  ctx.fillRect(266, 116, 7, 10);  // ลำตัว/เสื้อฟ้า (เตี้ยกว่าคนอื่น)
-
-  // ทีวีจอพิกเซล (ขยับลงมาตั้งบนตู้คอนโซลที่ฐานชนพื้นห้องพอดี)
-  const tvTop = 240;
-  ctx.fillStyle = '#2a2a2a';
-  ctx.fillRect(420, tvTop, 100, 66);
-  ctx.fillStyle = '#0a0a0a';
-  ctx.fillRect(428, tvTop + 6, 84, 50);
-  ctx.fillStyle = '#0d2b1a';
-  ctx.fillRect(432, tvTop + 10, 76, 42);
-
-  // ตัวเลขบนจอทีวี (วันที่พิเศษ) แสดงด้วยฟอนต์พิกเซลสีเขียวเรืองแสงแบบจอเก่า
-  ctx.save();
-  ctx.font = '13px "Press Start 2P"';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#4dff8a';
-  ctx.shadowColor = '#4dff8a';
-  ctx.shadowBlur = 6;
-  ctx.fillText('24092521', 420 + 50, tvTop + 33);
-  ctx.restore();
-
-  // ตู้คอนโซลวางทีวี (ฐานชนพื้นห้อง)
-  ctx.fillStyle = '#7a4a26';
-  ctx.fillRect(400, tvTop + 66, 140, GROUND_Y - (tvTop + 66) - 14);
-  ctx.fillStyle = '#5a3418';
-  ctx.fillRect(405, GROUND_Y - 14, 10, 14);
-  ctx.fillRect(525, GROUND_Y - 14, 10, 14);
-
-  // โซฟา (ขวาล่าง) - ขยับลงมาให้ขาโซฟาชนกับพื้นห้องพอดี
-  ctx.fillStyle = '#c0392b';
-  ctx.fillRect(600, 280, 160, 90);
-  ctx.fillStyle = '#a83224';
-  ctx.fillRect(600, 280, 160, 16); // พนักพิง
-  ctx.fillStyle = '#e0574a';
-  ctx.fillRect(612, 298, 60, 48); // เบาะซ้าย
-  ctx.fillRect(682, 298, 60, 48); // เบาะขวา
-  ctx.fillStyle = '#7a1f16';
-  ctx.fillRect(596, GROUND_Y - 20, 12, 20); // ขาโซฟาซ้าย
-  ctx.fillRect(752, GROUND_Y - 20, 12, 20); // ขาโซฟาขวา
-}
-
-/* ---------- 4. ITEMS (ไอเทมที่ต้องเก็บ) ---------- */
-// กำหนดตำแหน่งไอเทม 5 ชิ้น กระจายในฉาก บางชิ้นอยู่สูงต้องกระโดดเก็บ
-let items = [
-  { type: 'cake',   x: 150, y: GROUND_Y - 24, w: 22, h: 20, collected: false },
-  { type: 'beer',   x: 300, y: GROUND_Y - 22, w: 16, h: 22, collected: false },
-  { type: 'car',    x: 500, y: GROUND_Y - 16, w: 26, h: 14, collected: false },
-  { type: 'gift',   x: 660, y: GROUND_Y - 20, w: 20, h: 20, collected: false },
-  { type: 'money',  x: 250, y: GROUND_Y - 90, w: 22, h: 14, collected: false } // ลอยสูง ต้องกระโดดเก็บ
-];
-
-function resetItems() {
-  items.forEach(it => it.collected = false);
-  itemsCollected = 0;
-  document.getElementById('item-count').textContent = '0';
-}
-
-// วาดไอเทมแต่ละชนิดด้วยพิกเซลบล็อกง่ายๆ
-function drawItem(it) {
-  if (it.collected) return;
-  const x = Math.round(it.x);
-  const y = Math.round(it.y);
-
-  // เอฟเฟกต์ลอยขึ้นลงเล็กน้อย (bobbing)
-  const bob = Math.sin(Date.now() / 250 + it.x) * 3;
-  const dy = y + bob;
-
-  ctx.save();
-
-  if (it.type === 'cake') {
-    ctx.fillStyle = '#f7c9de';
-    ctx.fillRect(x, dy + 8, 22, 12);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x, dy + 8, 22, 3);
-    ctx.fillStyle = '#ff4d6d';
-    ctx.fillRect(x + 9, dy, 3, 8);
-    ctx.fillStyle = '#ffd400';
-    ctx.fillRect(x + 10, dy - 4, 1, 4);
-  } else if (it.type === 'beer') {
-    ctx.fillStyle = '#ffcc33';
-    ctx.fillRect(x + 3, dy + 4, 10, 18);
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(x + 3, dy + 2, 10, 4);
-    ctx.fillStyle = '#8a5a2a';
-    ctx.fillRect(x + 13, dy + 6, 4, 8); // หูจับ
-  } else if (it.type === 'car') {
-    ctx.fillStyle = '#e63946';
-    ctx.fillRect(x, dy + 2, 26, 8);
-    ctx.fillRect(x + 5, dy - 4, 14, 8);
-    ctx.fillStyle = '#bfe8ff';
-    ctx.fillRect(x + 7, dy - 2, 10, 5);
-    ctx.fillStyle = '#111';
-    ctx.fillRect(x + 2, dy + 9, 6, 6);
-    ctx.fillRect(x + 17, dy + 9, 6, 6);
-  } else if (it.type === 'gift') {
-    ctx.fillStyle = '#4ecdc4';
-    ctx.fillRect(x, dy + 4, 20, 16);
-    ctx.fillStyle = '#ffd400';
-    ctx.fillRect(x + 8, dy + 4, 4, 16);
-    ctx.fillRect(x, dy + 9, 20, 4);
-    ctx.fillStyle = '#ffd400';
-    ctx.fillRect(x + 5, dy, 3, 6);
-    ctx.fillRect(x + 12, dy, 3, 6);
-  } else if (it.type === 'money') {
-    ctx.fillStyle = '#4caf50';
-    ctx.fillRect(x, dy + 4, 22, 12);
-    ctx.fillStyle = '#2e7d32';
-    ctx.fillRect(x + 2, dy + 6, 18, 8);
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(x + 9, dy + 8, 4, 4);
-  }
-
-  ctx.restore();
-}
+const bgm = document.getElementById('bgm');
 
 /* ---------- 5. PHYSICS & CONTROLS ---------- */
 document.addEventListener('keydown', (e) => {
+  if (gameState !== 'playing') return;
   if (e.code === 'ArrowLeft') keys.left = true;
   if (e.code === 'ArrowRight') keys.right = true;
   if (e.code === 'ArrowUp' || e.code === 'Space') keys.up = true;
@@ -662,12 +374,10 @@ document.addEventListener('keyup', (e) => {
   if (e.code === 'ArrowUp' || e.code === 'Space') keys.up = false;
 });
 
-// ---- ปุ่มควบคุมบนหน้าจอ (Touch Controls) ----
-// รองรับทั้งการ "แตะ" บนมือถือ (touchstart/touchend) และ "คลิกเมาส์" บนคอม (mousedown/mouseup)
-// ผูกปุ่มแต่ละปุ่มเข้ากับตัวแปร keys ตัวเดียวกับที่คีย์บอร์ดใช้ เพื่อให้ logic การเคลื่อนไหวทำงานร่วมกันได้
 function bindHoldButton(el, onPress, onRelease) {
   const press = (e) => {
     e.preventDefault();
+    if (gameState !== 'playing') return;
     el.classList.add('active-press');
     onPress();
   };
@@ -676,314 +386,177 @@ function bindHoldButton(el, onPress, onRelease) {
     el.classList.remove('active-press');
     onRelease();
   };
-
   el.addEventListener('touchstart', press, { passive: false });
   el.addEventListener('touchend', release, { passive: false });
-  el.addEventListener('touchcancel', release, { passive: false });
-
   el.addEventListener('mousedown', press);
   el.addEventListener('mouseup', release);
-  el.addEventListener('mouseleave', release); // เผื่อลากเมาส์ออกนอกปุ่มระหว่างกด
+  el.addEventListener('mouseleave', release);
 }
 
 const btnLeft = document.getElementById('btn-left');
 const btnRight = document.getElementById('btn-right');
-const btnJump = document.getElementById('jump-btn');
+const jumpBtn = document.getElementById('jump-btn');
+
+bindHoldButton(btnLeft, () => { keys.left = true; player.facing = -1; }, () => keys.left = false);
+bindHoldButton(btnRight, () => { keys.right = true; player.facing = 1; }, () => keys.right = false);
+bindHoldButton(jumpBtn, () => { keys.up = true; }, () => keys.up = false);
+
+/* ---------- START GAME LOGIC (กดแล้วเพลงดัง) ---------- */
+const startScreen = document.getElementById('start-screen');
+const pressStartBtn = document.getElementById('press-start');
+const hud = document.getElementById('hud');
+const instructions = document.getElementById('instructions');
 const touchControls = document.getElementById('touch-controls');
 
-bindHoldButton(btnLeft, () => { keys.left = true; }, () => { keys.left = false; });
-bindHoldButton(btnRight, () => { keys.right = true; }, () => { keys.right = false; });
-bindHoldButton(btnJump, () => { keys.up = true; }, () => { keys.up = false; });
-
-function updatePlayer() {
-  // เดินซ้าย-ขวา
-  if (keys.left) {
-    player.x -= player.speed;
-    player.facing = -1;
+pressStartBtn.addEventListener('click', () => {
+  if (gameState === 'start') {
+    gameState = 'playing';
+    startScreen.style.display = 'none';
+    hud.style.display = 'block';
+    instructions.style.display = 'block';
+    touchControls.classList.add('visible');
+    
+    // สั่งเล่นเพลงประกอบทันทีเมื่อกดปุ่ม Start
+    bgm.play().catch(err => console.log("Audio block:", err));
+    
+    resetItems();
+    gameLoop();
   }
-  if (keys.right) {
-    player.x += player.speed;
-    player.facing = 1;
-  }
-  player.x = Math.max(0, Math.min(W - player.w, player.x));
-
-  // แอนิเมชันขาขยับเดิน
-  if (keys.left || keys.right) {
-    player.walkTimer++;
-    if (player.walkTimer > 8) {
-      player.walkFrame = player.walkFrame === 0 ? 1 : 0;
-      player.walkTimer = 0;
-    }
-  }
-
-  // กระโดด
-  if (keys.up && !player.jumping) {
-    player.vy = JUMP_FORCE;
-    player.jumping = true;
-  }
-
-  // แรงโน้มถ่วง
-  player.vy += GRAVITY;
-  player.y += player.vy;
-
-  // ชนพื้น
-  const floorLevel = GROUND_Y - player.h;
-  if (player.y >= floorLevel) {
-    player.y = floorLevel;
-    player.vy = 0;
-    player.jumping = false;
-  }
-}
+});
 
 /* ---------- 6. COLLISION & SCORE ---------- */
 function checkCollisions() {
   items.forEach(it => {
-    if (it.collected) return;
-    const overlap =
-      player.x < it.x + it.w &&
-      player.x + player.w > it.x &&
-      player.y < it.y + it.h &&
-      player.y + player.h > it.y;
-
-    if (overlap) {
-      it.collected = true;
-      itemsCollected++;
-      document.getElementById('item-count').textContent = itemsCollected;
-      playPickupSound();
-
-      if (itemsCollected >= TOTAL_ITEMS) {
-        startWinSequence();
+    if (!it.collected) {
+      if (player.x < it.x + it.w && player.x + player.w > it.x &&
+          player.y < it.y + it.h && player.y + player.h > it.y) {
+        it.collected = true;
+        itemsCollected++;
+        document.getElementById('item-count').textContent = itemsCollected;
+        
+        if (itemsCollected === TOTAL_ITEMS) {
+          triggerWin();
+        }
       }
     }
   });
 }
 
-// เสียง "ติ๊ง" สั้นๆ ตอนเก็บไอเทม สร้างด้วย WebAudio (ไม่ต้องใช้ไฟล์เสียงภายนอก)
-function playPickupSound() {
-  try {
-    const actx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = actx.createOscillator();
-    const gain = actx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(880, actx.currentTime);
-    gain.gain.setValueAtTime(0.08, actx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.2);
-    osc.connect(gain);
-    gain.connect(actx.destination);
-    osc.start();
-    osc.stop(actx.currentTime + 0.2);
-  } catch (e) { /* เบราว์เซอร์บางตัวอาจบล็อก autoplay audio ได้ ไม่เป็นไร */ }
-}
-
-/* ---------- 7. WIN SEQUENCE / SURPRISE POP-UP ---------- */
-function startWinSequence() {
+function triggerWin() {
   gameState = 'win-transition';
-  winFadeAlpha = 0;
-  winTextTimer = 0;
-  touchControls.classList.remove('visible'); // ซ่อนปุ่มควบคุมตอนขึ้นฉากจบ
+  keys.left = false; keys.right = false; keys.up = false;
+  document.getElementById('hbd-modal').classList.add('show');
+  document.getElementById('fireworks-canvas').style.display = 'block';
+  initFireworks();
 }
 
-function updateWinTransition() {
-  // ค่อยๆ ทำจอมืดลง
-  winFadeAlpha += 0.03;
-  if (winFadeAlpha >= 1) {
-    winFadeAlpha = 1;
-    winTextTimer++;
-    // รอสักครู่ให้ผู้เล่นเห็นคำว่า LEVEL CLEAR! แล้วค่อยเด้ง Pop-up
-    if (winTextTimer > 70) {
-      gameState = 'won';
-      showBirthdayModal();
-    }
-  }
-}
-
-function drawWinTransition() {
-  drawBackground();
-  items.forEach(drawItem);
-  drawPlayer();
-
-  ctx.fillStyle = `rgba(0,0,0,${winFadeAlpha})`;
-  ctx.fillRect(0, 0, W, H);
-
-  if (winFadeAlpha > 0.5) {
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.font = '28px "Press Start 2P"';
-    ctx.fillStyle = '#ffd400';
-    ctx.shadowColor = '#ff2e63';
-    ctx.shadowBlur = 10;
-    ctx.fillText('LEVEL CLEAR!', W / 2, H / 2);
-    ctx.restore();
-  }
-}
-
-function showBirthdayModal() {
-  const modal = document.getElementById('hbd-modal');
-  modal.classList.add('show');
-
-  // เริ่มเอฟเฟกต์พลุพิกเซล
-  startFireworks();
-
-  // เล่นเพลงพื้นหลัง (ผู้ใช้ต้องใส่ไฟล์เพลงของตัวเองใน <audio id="bgm"> ด้านบน)
-  const bgm = document.getElementById('bgm');
-  if (bgm && bgm.querySelector('source')) {
-    bgm.volume = 0.6;
-    bgm.play().catch(() => { /* เบราว์เซอร์อาจต้องให้ผู้ใช้กดปุ่มก่อนถึงจะเล่นเสียงได้ */ });
-  }
-}
-
-// กดปิด Pop-up แล้วกลับไปหน้า Start Screen เพื่อให้กด PRESS START เล่นใหม่ได้เรื่อยๆ
-function returnToStartScreen() {
-  // ปิด Pop-up
+document.getElementById('hbd-close').addEventListener('click', () => {
   document.getElementById('hbd-modal').classList.remove('show');
+  gameState = 'won';
+});
 
-  // หยุดเพลงและรีเซ็ตเสียง
-  const bgm = document.getElementById('bgm');
-  if (bgm) {
-    bgm.pause();
-    bgm.currentTime = 0;
-  }
-
-  // หยุดและล้างเอฟเฟกต์พลุ
-  fireworksActive = false;
-  fireworkParticles = [];
-  fwCanvas.style.display = 'none';
-  fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
-
-  // ซ่อน HUD / ปุ่มควบคุม แล้วโชว์หน้า Start Screen เหมือนตอนเปิดเกมครั้งแรก
-  document.getElementById('hud').style.display = 'none';
-  document.getElementById('instructions').style.display = 'none';
-  touchControls.classList.remove('visible');
-  document.getElementById('start-screen').style.display = 'flex';
-
-  gameState = 'start';
-
-  // วาดฉากตั้งต้นค้างไว้เบาๆ ด้านหลัง Start Screen เหมือนตอนโหลดเกมครั้งแรก
-  player.x = 60;
-  player.y = GROUND_Y - player.h;
-  player.vy = 0;
-  resetItems();
-  drawBackground();
-  items.forEach(drawItem);
-  drawPlayer();
-}
-
-document.getElementById('hbd-close').addEventListener('click', returnToStartScreen);
-
-/* ---------- 8. PIXEL FIREWORKS (เอฟเฟกต์พลุฉลอง) ---------- */
+/* ---------- 8. PIXEL FIREWORKS ---------- */
 const fwCanvas = document.getElementById('fireworks-canvas');
 const fwCtx = fwCanvas.getContext('2d');
-let fireworkParticles = [];
-let fireworksActive = false;
-let fireworkSpawnTimer = 0;
+let particles = [];
 
-const FW_COLORS = ['#ff2e63', '#ffd400', '#4ad4ff', '#7bff8a', '#c77bff', '#ff8a00'];
-
-function spawnFirework() {
-  const cx = Math.random() * fwCanvas.width;
-  const cy = Math.random() * fwCanvas.height * 0.6 + 30;
-  const color = FW_COLORS[Math.floor(Math.random() * FW_COLORS.length)];
-  const particleCount = 18;
-  for (let i = 0; i < particleCount; i++) {
-    const angle = (Math.PI * 2 * i) / particleCount;
-    const speed = 1.5 + Math.random() * 2;
-    fireworkParticles.push({
-      x: cx, y: cy,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: 60,
-      color: color,
-      size: 3
-    });
-  }
-}
-
-function startFireworks() {
-  fireworksActive = true;
-  fwCanvas.style.display = 'block';
+function initFireworks() {
+  particles = [];
 }
 
 function updateFireworks() {
-  if (!fireworksActive) return;
-
-  fireworkSpawnTimer++;
-  if (fireworkSpawnTimer > 40) {
-    spawnFirework();
-    fireworkSpawnTimer = 0;
+  if (Math.random() < 0.05) {
+    const rx = Math.random() * W;
+    const ry = Math.random() * (H / 2);
+    const colors = ['#ff2e63', '#ffd400', '#4ad4ff', '#7bff8a', '#ff8a00'];
+    const col = colors[Math.floor(Math.random() * colors.length)];
+    for(let i=0; i<30; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 3 + 1;
+      particles.push({
+        x: rx, y: ry,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        color: col, alpha: 1,
+        life: Math.random() * 30 + 30
+      });
+    }
   }
-
-  fwCtx.clearRect(0, 0, fwCanvas.width, fwCanvas.height);
-
-  fireworkParticles.forEach(p => {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += 0.04; // แรงโน้มถ่วงเบาๆ กับพลุ
-    p.life--;
-
-    fwCtx.fillStyle = p.color;
-    fwCtx.globalAlpha = Math.max(p.life / 60, 0);
-    fwCtx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
+  
+  particles.forEach((p, idx) => {
+    p.x += p.vx; p.y += p.vy; p.vy += 0.04; p.life--;
+    if(p.life <= 0) particles.splice(idx, 1);
   });
-  fwCtx.globalAlpha = 1;
+}
 
-  fireworkParticles = fireworkParticles.filter(p => p.life > 0);
+function drawFireworks() {
+  fwCtx.clearRect(0,0,W,H);
+  particles.forEach(p => {
+    fwCtx.fillStyle = p.color;
+    fwCtx.fillRect(Math.round(p.x), Math.round(p.y), 4, 4);
+  });
 }
 
 /* ---------- 9. GAME LOOP ---------- */
-function gameLoop() {
+function update() {
   if (gameState === 'playing') {
-    updatePlayer();
+    if (keys.left) player.x -= player.speed;
+    if (keys.right) player.x += player.speed;
+    
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.w > W) player.x = W - player.w;
+    
+    if (keys.up && !player.jumping) {
+      player.vy = JUMP_FORCE;
+      player.jumping = true;
+    }
+    
+    player.vy += GRAVITY;
+    player.y += player.vy;
+    
+    if (player.y >= GROUND_Y - player.h) {
+      player.y = GROUND_Y - player.h;
+      player.vy = 0;
+      player.jumping = false;
+    }
+    
+    if (keys.left || keys.right) {
+      player.walkTimer++;
+      if (player.walkTimer > 8) {
+        player.walkFrame = player.walkFrame === 0 ? 1 : 0;
+        player.walkTimer = 0;
+      }
+    }
+    
     checkCollisions();
-
-    drawBackground();
-    items.forEach(drawItem);
-    drawPlayer();
-  } else if (gameState === 'win-transition') {
-    updateWinTransition();
-    drawWinTransition();
-  } else if (gameState === 'won') {
-    // ค้างฉากมืดพร้อมข้อความไว้ด้านหลัง Pop-up
-    drawWinTransition();
+  }
+  
+  if (gameState === 'win-transition' || gameState === 'won') {
     updateFireworks();
   }
-
-  requestAnimationFrame(gameLoop);
 }
 
-/* ---------- เริ่มต้นเกมเมื่อกด PRESS START ---------- */
-function startGame() {
-  document.getElementById('start-screen').style.display = 'none';
-  document.getElementById('hud').style.display = 'block';
-  document.getElementById('instructions').style.display = 'block';
-  touchControls.classList.add('visible');
-
-  // รีเซ็ตสถานะทั้งหมดให้เล่นใหม่ได้
-  player.x = 60;
-  player.y = GROUND_Y - player.h;
-  player.vy = 0;
-  resetItems();
-  fireworkParticles = [];
-  fireworksActive = false;
-  fwCanvas.style.display = 'none';
-  document.getElementById('hbd-modal').classList.remove('show');
-
-  gameState = 'playing';
-}
-
-document.getElementById('press-start').addEventListener('click', startGame);
-document.addEventListener('keydown', (e) => {
-  if (gameState === 'start' && (e.code === 'Enter' || e.code === 'Space')) {
-    startGame();
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  drawBackground();
+  items.forEach(drawItem);
+  drawPlayer();
+  
+  if (gameState === 'win-transition' || gameState === 'won') {
+    drawFireworks();
   }
-});
+}
 
-// วาดฉากพื้นหลังไว้ล่วงหน้าตั้งแต่หน้า Start Screen (ให้เห็นผ่านๆ ตอนโหลด)
+function gameLoop() {
+  update();
+  draw();
+  if (gameState === 'playing' || gameState === 'win-transition' || gameState === 'won') {
+    requestAnimationFrame(gameLoop);
+  }
+}
+
+// วาดหน้าแรกเริ่มไว้ก่อน
 drawBackground();
-items.forEach(drawItem);
 drawPlayer();
-
-// เริ่มลูปเกม
-requestAnimationFrame(gameLoop);
+items.forEach(drawItem);
 </script>
-</body>
-</html>
